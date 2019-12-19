@@ -1,0 +1,17 @@
+123
+mkdir 1
+touch 123.c
+w 123.c
+#include<iostream>
+using namespace std;
+int main()
+{
+    return 0;
+}$
+cp 123.c 456.c
+cd 1
+mkdir 2
+touch 456.c
+cd 2
+mkdir 3
+touch 789.c

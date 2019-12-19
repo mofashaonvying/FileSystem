@@ -14,9 +14,9 @@ FileSystem::~FileSystem()
 
 int FileSystem::name_is_right(const char* name)
 {
-	for (int i = 0; i < strlen(name); i++)   //Ä¿Â¼Ãû»òÎÄ¼şÃû²»ÄÜ°üº¬/¡¢\¡¢:¡¢"
+	for (int i = 0; i < strlen(name); i++)   //Ä¿Â¼Ãû»òÎÄ¼şÃû²»ÄÜ°üº¬/¡¢\¡¢:¡¢" ¿Õ¸ñ ?
 	{
-		if (name[i] == '/'||name[i]=='\\'|| name[i] == ':'|| name[i] == '"')
+		if (name[i] == '/'||name[i]=='\\'|| name[i] == ':'|| name[i] == '"' || name[i] == ' ' || name[i] == '?')
 			return 0;
 	}
 	return 1;
@@ -105,7 +105,7 @@ int FileSystem::createDir(const char* name)
 	return 1;
 }
 
-int FileSystem::enterDir(const char* name)
+int FileSystem::enterDir(const char* name) 
 {
 	Directory* p = findDir(name);
 	if (p != 0) {
@@ -139,14 +139,17 @@ int FileSystem::rename(const char* name, const char*newname)//0.ÎÄ¼ş²»´æÔÚ -1.ĞÂ
 {
 	File* fp= findFile(name);
 	Directory* dp = findDir(name);
+	File* nfp = findFile(newname);
+	Directory* ndp = findDir(newname);
 	if (fp == 0 && dp == 0)return 0;
+	if (nfp != 0 || ndp != 0)return -1;
 	if (fp!=0) {
-		if (findFile(newname))return -1;
+		if (nfp)return -1;
 		strcpy(fp->name, newname);
 		return 1;
 	}
 	if (dp != 0) {
-		if (findDir(newname))return -1;
+		if (ndp)return -1;
 		strcpy(dp->name, newname);
 		return 1;
 	}
@@ -281,8 +284,8 @@ int FileSystem::move(const char* name, const char* path) // 0±íÊ¾¸ÃÄ¿Â¼ÏÂÃ»ÓĞ¸ÃÃ
 	Directory* dp = findDir(name);
 	if (fp == 0 && dp == 0)return 0;
 	Directory* p = path_is_right(path);
-	if (findFile(name, p) != 0 && findDir(name) != 0)return  -2;
 	if (p == 0)return -1;
+	if (findFile(name, p) != 0 || findDir(name,p) != 0)return  -2;
 	if (fp != 0)
 	{
 		File* ptr = currentdir->filechild;
@@ -313,6 +316,7 @@ int FileSystem::move(const char* name, const char* path) // 0±íÊ¾¸ÃÄ¿Â¼ÏÂÃ»ÓĞ¸ÃÃ
 				currentdir->dirchild = dp->next;
 				dp->next = p->dirchild;
 				p->dirchild = dp;
+				dp->parent = p;
 				return 1;
 			}
 			if (ptr->next == dp)
@@ -320,6 +324,7 @@ int FileSystem::move(const char* name, const char* path) // 0±íÊ¾¸ÃÄ¿Â¼ÏÂÃ»ÓĞ¸ÃÃ
 				ptr->next = dp->next;
 				dp->next = p->dirchild;
 				p->dirchild = dp;
+				dp->parent = p;
 				return 1;
 			}
 			ptr = ptr->next;
@@ -327,12 +332,276 @@ int FileSystem::move(const char* name, const char* path) // 0±íÊ¾¸ÃÄ¿Â¼ÏÂÃ»ÓĞ¸ÃÃ
 	}
 }
 
-int FileSystem::cpoy(const char* str1, const char* str2)
+int FileSystem::copy(const char* name, const char* str)// -1 ÃüÃû´íÎó 0 ²»´æÔÚ -2 ¸ÃÄ¿Â¼ÏÂÎÄ¼ş»òÄ¿Â¼ÒÑ´æÔÚ -3 Â·¾¶²»ÕıÈ·
 {
-	
+	File* fp = findFile(name);
+	Directory* dp = findDir(name);
+	Directory* pp = path_is_right(str);
+	if (fp == 0 && dp == 0)return 0;
+	if (fp)
+	{
+		File* newfp = new File(fp->name);
+		newfp->context = fp->context;
+		if (pp)
+		{
+			if (findFile(name, pp))return -2;
+			newfp->next = pp->filechild;
+			pp->filechild = newfp;
+			return 1;
+		}
+		else
+		{
+			if (strchr(str, '/')) return -3;
+			if (!name_is_right(str))return -1;
+			File* p = findFile(str);
+			if (p == 0)
+			{
+				strcpy(newfp->name, str);
+				newfp->next = currentdir->filechild;
+				currentdir->filechild = newfp;
+				return 1;
+			}
+			else
+			{
+				p->context = newfp->context;
+				delete newfp;
+				return 1;
+			}
+		}
+	}
+	if (dp)
+	{
+		Directory* newdp = copyDir(dp);
+		if (pp)
+		{
+			if (findDir(name, pp))return -2;
+			newdp->next = pp->dirchild;
+			pp->dirchild = newdp;
+			newdp->parent = pp;
+			return 1;
+		}
+		return -3;
+	}
 	return 0;
 }
 
+string FileSystem::read(File* fp)
+{
+	return fp->context;
+}
+
+int FileSystem::write(File* fp,string txt)//Ğ´ÎÄ¼ş
+{
+	fp->context = txt;
+	return 0;
+}
+
+int FileSystem::getOption(char*word,string&txt ,int type) //´ÓÎÄ¼ş»òÕß¼üÅÌ¶ÁÈëÃüÁî 1.Îª¼üÅÌ 2.ÎªÎÄ¼ş
+{												//·µ»ØÖµ 0.ÃüÁî´íÎó 1ÃüÁîÕıÈ· 2.ÎªÃüÃû´íÎó 3.¸ÃÄ¿Â¼ÏÂÎÄ¼ş»òÄ¿Â¼²»´æÔÚ 4.¸ÃÂ·¾¶ÏÂÒÑÓĞÍ¬ÃûÎÄ¼ş 5 Â·¾¶²»ÕıÈ·
+	int n = 0, len = strlen(word), i;          //6 ĞÂÎÄ¼şÃûÒÑ´æÔÚ 7 ÒÑ¾­ÊÇ¸ùÄ¿Â¼ÁË -1 ÍË³ö³ÌĞò
+	char option[10], var1[45], var2[45];
+	while (word[n] == ' ')n++;
+	for (i=0; n < len; n++, i++)
+	{
+		if (word[n] == ' ')break;
+		option[i] = word[n];
+	}
+	option[i] = '\0';
+
+	while (word[n] == ' ')n++;
+	for (i = 0; n < len; n++, i++)
+	{
+		if (word[n] == ' ')break;
+		var1[i] = word[n];
+	}
+	var1[i] = '\0';
+
+	while (word[n] == ' ')n++;
+	for (i = 0; n < len; n++, i++)
+	{
+		if (word[n] == ' ')break;
+		var2[i] = word[n];
+	}
+	var2[i] = '\0';
+
+	if (n < len)return 0;  //´óÓÚÁ½¸ö²ÎÊı
+
+	//°ïÖú
+	if (strcmp(var1, "?") == 0 && type == 1)
+	{
+		if (strlen(var2) != 0) return 0;
+		if (strcmp(option, "mv") == 0)
+		{
+			cout << "  mv      ÒÆ¶¯ÎÄ¼ş»òÄ¿Â¼" << endl;
+			cout << "    mv [file] [dir]      ÒÆ¶¯¸ÃÄ¿Â¼ÏÂµÄÎÄ¼şµ½¸ÃÄ¿Â¼ÏÂµÄÄ¿Â¼ÖĞ" << endl;
+			cout << "    mv [file] [path]     ÒÆ¶¯¸ÃÄ¿Â¼ÏÂµÄÎÄ¼şµ½Ö¸¶¨Â·¾¶" << endl;
+			cout << "    mv [dir]  [dir]      ÒÆ¶¯¸ÃÄ¿Â¼ÏÂµÄÄ¿Â¼µ½¸ÃÄ¿Â¼ÏÂµÄÄ¿Â¼ÖĞ" << endl;
+			cout << "    mv [dir]  [path]     ÒÆ¶¯¸ÃÄ¿Â¼ÏÂµÄÄ¿Â¼µ½Ö¸¶¨Â·¾¶" << endl;
+		}
+		else if (strcmp(option, "rnm") == 0)
+		{
+			cout << "  rnm     ÖØÃüÃûÎÄ¼ş»òÄ¿Â¼" << endl;
+			cout << "    rnm [dir]  [newname]  ½«¸ÃÄ¿Â¼ÏÂµÄÄ¿Â¼Ãû¸ÄÎªĞÂµÄÄ¿Â¼Ãû" << endl;
+			cout << "    rnm [file] [newname]  ½«¸ÃÄ¿Â¼ÏÂµÄÎÄ¼şÃû¸ÄÎªĞÂµÄÎÄ¼şÃû" << endl;
+		}
+		else if (strcmp(option, "cp") == 0)
+		{
+			cout << "  cp      ¸´ÖÆÎÄ¼ş»òÄ¿Â¼" << endl;
+			cout << "    cp  [file] [newname]  ÔÚ¸ÃÄ¿Â¼ÏÂ¸´ÖÆÎÄ¼ş£¬ÈôĞÂÎÄ¼şÃûÒÑ´æÔÚÔò¸²¸Ç" << endl;
+			cout << "    cp  [file] [path]     ¸´ÖÆÎÄ¼şµ½Ö¸¶¨Â·¾¶" << endl;
+			cout << "    cp  [dir] [path]      ¸´ÖÆÄ¿Â¼µ½Ö¸¶¨Â·¾¶" << endl;
+		}
+		else if (strcmp(option, "cd") == 0)
+		{
+			cout << "  cd    ½øÈëÄ¿Â¼»ò·µ»ØÉÏÒ»¼¶" << endl;
+			cout << "    cd [dir]   ½øÈë¸ÃÄ¿Â¼ÏÂµÄÄ¿Â¼" << endl;
+			cout << "    cd [path]  ½øÈë¸øÂ·¾¶µÄÄ¿Â¼" << endl;
+			cout << "    cd..       ·µ»ØÉÏÒ»¼¶Ä¿Â¼" << endl;
+		}
+		else if (strcmp(option, "mkdir") == 0)
+			cout << "  mkdir [dirname]  ´´½¨Ä¿Â¼" << endl;
+		else if (strcmp(option, "touch") == 0)
+			cout << "  touch [filename] ´´½¨ÎÄ¼ş" << endl;
+		else if (strcmp(option, "ls") == 0)
+			cout << "  ls    ÁĞ³ö¸ÃÄ¿Â¼ÏÂËùÓĞµÄÎÄ¼şºÍÄ¿Â¼" << endl;
+		else if (strcmp(option, "rm") == 0)
+		{
+			cout << "  rm    É¾³ıÎÄ¼ş»òÄ¿Â¼" << endl;
+			cout << "    rm [file]   É¾³ıÎÄ¼ş" << endl;
+			cout << "    rm [dir]    É¾³ıÄ¿Â¼" << endl;
+		}
+		else if (strcmp(option, "r") == 0)
+			cout << "  r [file]      ¶ÁÈ¡ÎÄ¼ş" << endl;
+		else if (strcmp(option, "w") == 0)
+			cout << "  w [file]      Ğ´ÎÄ¼ş" << endl;
+		else
+			return 0;
+		return 8;
+	}
+
+	//Á½¸ö²ÎÊıµÄ
+	if (strcmp(option, "mv") == 0)
+	{
+		int t = move(var1, var2);
+		if (t == 0)return 2;
+		if (t == -1)return 4;
+		if (t == -2)return 3;
+		return 1;
+	}
+	if (strcmp(option, "rnm") == 0)
+	{
+		int t = rename(var1, var2);
+		if (t == 0)return 2;
+		if (t == -1)return 6;
+		return 1;
+	}
+	if (strcmp(option, "cp") == 0)
+	{
+		int t = copy(var1, var2);
+		if (t == 0)return 2;
+		if (t == -1)return 5;
+		if (t == -2)return 3;
+		if (t == -3)return 4;
+		return 1;
+	}
 
 
+	//Ò»¸ö²ÎÊıµÄ
+
+	if (strlen(var2) != 0) return 0;
+	if (strcmp(option, "cd") == 0)
+	{
+		if (enterDir(var1) == 0)
+			return 4;
+		return 1;
+	}
+	if (strcmp(option, "mkdir") == 0)
+	{
+		if (name_is_right(var1))
+		{
+			if (createDir(var1) == 0)
+				return 3;
+		}
+		else
+			return 5;
+		return 1;
+	}
+	if (strcmp(option, "touch") == 0)
+	{
+		if (name_is_right(var1))
+		{
+			if (createFile(var1) == 0)
+				return 3;
+		}
+		else
+			return 5;
+		return 1;
+	}
+	if (strcmp(option, "rm") == 0)
+	{
+		int t = remove(var1);
+		if (t == 0)return 2;
+		return 1;
+	}
+	if (strcmp(option, "r") == 0 && type == 1)
+	{
+		File* p = findFile(var1);
+		if (p == 0)
+			return 2;
+		else
+			cout << read(p) << endl;
+		return 8;
+	}
+	if (strcmp(option, "w") == 0 && type == 1)
+	{
+		File* p = findFile(var1);
+		if (p == 0)
+			return 2;
+		char ch;
+		string str = "";
+		while ((ch = getchar()) != '$')
+			str += ch;
+		txt = str;
+		write(p, str);
+		while ((ch = getchar()) != '\n') {}
+		return 1;
+	}
+
+	//ÎŞ²ÎµÄ
+
+	if (strlen(var1) != 0) return 0;
+	if (strcmp(option, "ls") == 0 && type == 1)
+	{
+		showDirContext();
+		return 8;
+	}
+	if (strcmp(option, "cd..") == 0)
+	{
+		if (currentdir == root)return 7;
+		returnDir();
+		return 1;
+	}
+	if (strcmp(option, "exit") == 0)
+	{
+		return -1;
+	}
+	if (strcmp(option, "help") == 0&&type==1) 
+	{
+		cout << "ÓĞ¹ØÓÚÄ³¸öÃüÁîµÄÏêÏ¸ĞÅÏ¢£¬ÇëÊäÈë[²Ù×÷·û]+£¿" << endl;
+		cout << "  ls                                ÁĞ³ö¸ÃÄ¿Â¼ÏÂËùÓĞµÄÎÄ¼şºÍÄ¿Â¼" << endl;
+		cout << "  cd    [dir/path]/..               ½øÈëÄ¿Â¼»ò·µ»ØÉÏÒ»¼¶" << endl;
+		cout << "  touch [filename]                  ´´½¨ÎÄ¼ş" << endl;
+		cout << "  mkdir [dirname]                   ´´½¨Ä¿Â¼" << endl;
+		cout << "  r     [file]                      ¶ÁÈ¡ÎÄ¼ş" << endl;
+		cout << "  w     [file]                      Ğ´ÎÄ¼ş" << endl;
+		cout << "  rnm   [file/dir] [newname]        ÖØÃüÃûÎÄ¼ş»òÄ¿Â¼" << endl;
+		cout << "  cp    [file/dir] [newname/path]   ¸´ÖÆÎÄ¼ş»òÄ¿Â¼" << endl;
+		cout << "  mv    [file/dir] [dir/path]       ÒÆ¶¯ÎÄ¼ş»òÄ¿Â¼" << endl;
+		cout << "  rm    [file/dir]                  É¾³ıÎÄ¼ş»òÄ¿Â¼" << endl;
+		cout << "  exit                              ÍË³ö" << endl;
+		return 8;
+	}
+
+	return 0;
+}
 
