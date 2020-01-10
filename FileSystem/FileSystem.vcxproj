@@ -130,6 +130,7 @@
     <ClCompile Include="myshell.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <Text Include="abc.txt" />
     <Text Include="admin.txt" />
     <Text Include="temp.txt" />
   </ItemGroup>
