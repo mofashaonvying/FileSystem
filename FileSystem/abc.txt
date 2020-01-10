@@ -1,0 +1,21 @@
+123
+mkdir A
+mkdir B
+cd A
+mkdir a1
+touch b1
+cd a1
+mkdir b2
+touch a2
+w a2
+vbsduvjdsno
+sdnvkjdns
+bjsdv$
+cd root
+cp A B
+cd B
+cd A
+cd a1
+cd root
+rnm A C
+rm C

@@ -15,3 +15,12 @@ touch 456.c
 cd 2
 mkdir 3
 touch 789.c
+cd 3
+touch 123.c
+mkdir 456
+cd..
+cd..
+cp 2 root
+cd..
+cd 2
+cd 3

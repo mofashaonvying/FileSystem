@@ -235,7 +235,8 @@ void FileSystem::deleteDir(Directory* dir)
 			deleteDir(p);
 		}
 		dir->dirchild = 0;
-		deleteDir(dir);
+		//deleteDir(dir);
+		delete dir;
 	}
 }
 
@@ -258,7 +259,7 @@ Directory* FileSystem::copyDir(Directory* dir)
 	}
 
 	Directory* dp = dir->dirchild;
-	Directory* newdp = new Directory(dp->name);
+	Directory* newdp = copyDir(dp);
 	newdir->dirchild = newdp;
 	newdp->parent = newdir;
 	dp = dp->next;
